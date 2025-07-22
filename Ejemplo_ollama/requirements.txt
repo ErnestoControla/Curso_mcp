@@ -1,0 +1,4 @@
+fastmcp
+pymysql
+typing-extensions
+requests 

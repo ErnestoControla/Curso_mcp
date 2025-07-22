@@ -1,0 +1,13 @@
+{
+  "mariadb": {
+    "host": "172.16.1.29",
+    "user": "controla",
+    "password": "controla",
+    "charset": "utf8mb4"
+  },
+  "ollama": {
+    "host": "172.16.1.37",
+    "port": 11434,
+    "model": "llama3.1:8b"
+  }
+}
