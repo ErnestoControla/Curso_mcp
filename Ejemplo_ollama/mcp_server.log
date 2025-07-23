@@ -5,3 +5,28 @@
 2025-07-23 11:54:30,257 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
 2025-07-23 11:54:32,836 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
 2025-07-23 11:58:09,522 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:38:08,046 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-23 12:38:08,093 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-23 12:38:08,096 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:38:08,097 - __main__ - INFO - 🔍 Probando conexión a la base de datos MariaDB
+2025-07-23 12:39:00,286 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:39:42,472 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:40:57,928 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:40:57,928 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT * FROM core_registro WHERE fecha_registro >= NOW() - INTERVAL 7 DAY...
+2025-07-23 12:50:03,021 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-23 12:50:03,068 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-23 12:50:03,071 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:50:03,071 - __main__ - INFO - 🔍 Probando conexión a la base de datos MariaDB
+2025-07-23 12:50:39,659 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:51:14,938 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:52:07,394 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:52:14,388 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:52:14,388 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT * FROM core_registro WHERE tiempo >= NOW() - INTERVAL 7 DAY...
+2025-07-23 12:54:12,873 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:55:33,216 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:55:40,980 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:55:40,981 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT DISTINCT usuario_id FROM core_registro WHERE tiempo >= NOW() - INTERVAL 7 DAY...
+2025-07-23 12:57:38,973 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:57:47,416 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:57:55,105 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-23 12:57:55,105 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT usuario_id...

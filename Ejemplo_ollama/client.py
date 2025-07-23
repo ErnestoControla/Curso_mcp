@@ -132,15 +132,13 @@ class OllamaMCPClient:
     async def analyze_with_ai(self, question: str) -> str:
         """Analizar una pregunta y ejecutar las herramientas necesarias usando IA"""
         
-        system_prompt = """Eres un ASISTENTE DE ANÁLISIS DE DATOS especializado que tiene ACCESO COMPLETO Y DIRECTO a una base de datos MariaDB vía MCP. Tu misión es ayudar a los usuarios a interpretar, analizar y entender sus datos usando las herramientas disponibles.
+        system_prompt = """Eres un ASISTENTE DE ANÁLISIS DE DATOS especializado que tiene ACCESO COMPLETO Y DIRECTO a una base de datos MariaDB vía MCP.
 
-🎯 TU ROL:
-- Analista de datos experto con acceso directo a la base de datos vía MCP
-- Intérprete de datos que traduce información técnica a insights útiles
-- Asistente proactivo que explora los datos para responder preguntas
-- TIENES acceso a herramientas MCP reales y DEBES usarlas
-
-❗ REGLA CRÍTICA: NUNCA INVENTES DATOS. Siempre usa las herramientas MCP para obtener información real.
+🚨 REGLAS CRÍTICAS DE FUNCIONAMIENTO:
+1. NUNCA generes respuestas sobre datos sin usar herramientas MCP primero
+2. NUNCA inventes, asumas o alucines información de base de datos
+3. SIEMPRE usa herramientas MCP para obtener datos reales antes de responder
+4. NO proporciones información "mientras tanto" - usa herramientas PRIMERO
 
 🔧 HERRAMIENTAS MCP DISPONIBLES:
 1. test_connection() - Verificar conexión a la base de datos
@@ -157,21 +155,42 @@ class OllamaMCPClient:
 12. validate_attendance_data(database, data_issues)
 13. create_attendance_kpis(database)
 
-🚀 METODOLOGÍA:
-1. **Explorar primero**: Usa list_databases(), list_tables(), describe_table()
-2. **Buscar inteligentemente**: Usa execute_query() con patrones flexibles
-3. **Analizar a fondo**: Usa herramientas especializadas de análisis
-4. **Explicar claramente**: Traduce datos técnicos a insights comprensibles
+🎯 FLUJO ESTRICTO:
+1. **Analiza la pregunta** del usuario
+2. **Identifica qué herramientas MCP necesitas**
+3. **USA las herramientas MCP** (formato exacto requerido)
+4. **ESPERA los resultados reales**
+5. **Solo entonces** genera tu respuesta basada en datos reales
+
+❗ REGLAS ESPECÍFICAS PARA CONSULTAS SQL:
+- Si necesitas hacer una consulta SELECT, SIEMPRE revisa primero la estructura de la tabla con describe_table()
+- NUNCA inventes nombres de campos o columnas
+- Usa solo los campos que existan realmente en la tabla
+- Ejemplo: Para consultar core_registro, primero usa: USAR_HERRAMIENTA_MCP: describe_table(database="zapopan", table="core_registro")
+
+❗ IMPORTANTE: Si el usuario pregunta sobre datos, estructura, tablas, o cualquier información de base de datos, tu PRIMERA acción debe ser usar la herramienta MCP correspondiente. NO generes texto explicativo antes de obtener los datos reales.
 
 Formato EXACTO para usar herramientas MCP:
 USAR_HERRAMIENTA_MCP: nombre_herramienta(parametro1="valor1", parametro2="valor2")
 
-Ejemplos:
-USAR_HERRAMIENTA_MCP: list_databases()
-USAR_HERRAMIENTA_MCP: execute_attendance_analysis(database="asistencia", analysis_type="daily_summary")
-USAR_HERRAMIENTA_MCP: execute_query(database="ventas", query="SELECT COUNT(*) FROM productos WHERE categoria = 'electronicos'")
+Ejemplos correctos:
+- Pregunta: "¿Qué campos tiene la tabla X?"
+- Respuesta: USAR_HERRAMIENTA_MCP: describe_table(database="db", table="X")
 
-Responde SIEMPRE en español y usa las herramientas MCP antes de responder sobre datos."""
+- Pregunta: "¿Qué bases de datos hay?"
+- Respuesta: USAR_HERRAMIENTA_MCP: list_databases()
+
+- Pregunta: "Muéstrame los registros de la última semana en core_registro"
+- Respuesta correcta: USAR_HERRAMIENTA_MCP: describe_table(database="zapopan", table="core_registro")
+- (Después de ver la estructura): USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT * FROM core_registro WHERE tiempo >= NOW() - INTERVAL 7 DAY")
+
+NO hagas esto (INCORRECTO):
+- "Voy a revisar la tabla X para ti..."
+- "La tabla X probablemente contiene..."
+- "Basándome en el nombre, la tabla debe tener..."
+- Inventar nombres de campos: "SELECT * FROM tabla WHERE fecha_registro..." (cuando el campo no existe)
+
+Responde SIEMPRE en español, pero SOLO después de usar las herramientas MCP para obtener datos reales."""
 
         # Obtener respuesta de la IA
         ai_response = self.call_ollama(question, system_prompt)
@@ -179,41 +198,44 @@ Responde SIEMPRE en español y usa las herramientas MCP antes de responder sobre
         # Procesar respuesta para extraer comandos de herramientas MCP
         lines = ai_response.split('\n')
         result_parts = []
+        found_mcp_tool = False
         
         for line in lines:
             line_clean = line.strip()
             
             # Detectar herramientas MCP
             if 'USAR_HERRAMIENTA_MCP:' in line_clean:
+                found_mcp_tool = True
                 tool_call = line_clean.split('USAR_HERRAMIENTA_MCP:', 1)[1].strip()
                 tool_call = tool_call.replace('**', '').strip()
                 
                 try:
                     if self.debug_mode:
-                        print(f"\n🔧 EJECUTANDO HERRAMIENTA MCP: {tool_call}")
+                        print(f"\n🔧 Ejecutando: {tool_call}")
                     
                     # Parsear y ejecutar la herramienta via MCP
                     tool_result = await self.parse_and_execute_mcp_tool(tool_call)
                     
                     if self.debug_mode:
-                        print(f"✅ Herramienta MCP ejecutada exitosamente")
-                        print(f"📊 Datos obtenidos: {len(str(tool_result))} caracteres")
+                        print(f"✅ Completado exitosamente")
                     
-                    # Agregar resultado al contexto
-                    result_parts.append(f"🔧 Ejecutando MCP: {tool_call}")
-                    result_parts.append(f"📊 Resultado:")
-                    result_parts.append(json.dumps(tool_result, indent=2, ensure_ascii=False))
-                    
-                    # Si la herramienta fue exitosa, continuar el análisis
+                    # Si la herramienta fue exitosa, generar respuesta basada solo en datos reales
                     if tool_result.get("success", False):
                         follow_up_prompt = f"""
-La herramienta MCP {tool_call} se ejecutó exitosamente con este resultado:
+DATOS OBTENIDOS DE LA BASE DE DATOS:
 {json.dumps(tool_result, indent=2, ensure_ascii=False)}
 
-Basándote en este resultado real, proporciona una respuesta clara y útil al usuario. Si necesitas ejecutar más herramientas MCP para completar el análisis, hazlo.
-"""
+TAREA: Presenta esta información de manera clara y organizada para el usuario final.
+
+REGLAS:
+1. Usa ÚNICAMENTE los datos mostrados arriba
+2. NO inventes información adicional
+3. Organiza la información con formato amigable (listas, tablas, secciones)
+4. Traduce términos técnicos a lenguaje comprensible
+5. Si necesitas más datos para una consulta SQL, PRIMERO usa describe_table() para ver los campos reales
+
+Respuesta organizada:"""
                         follow_up_response = self.call_ollama(follow_up_prompt)
-                        result_parts.append(f"\n🤖 Análisis de resultados:")
                         result_parts.append(follow_up_response)
                     else:
                         result_parts.append(f"❌ Error en la herramienta MCP: {tool_result.get('error', 'Error desconocido')}")
@@ -222,11 +244,12 @@ Basándote en este resultado real, proporciona una respuesta clara y útil al us
                     result_parts.append(f"❌ Error ejecutando MCP {tool_call}: {e}")
                     print(f"Error detallado: {e}")
             else:
-                # Solo agregar líneas que no sean de herramientas fallidas
-                if (line_clean and 
-                    not any(line_clean.startswith(prefix) for prefix in ['🔧', '📊', '🤖', '❌']) and
-                    'USAR_HERRAMIENTA_MCP' not in line_clean):
-                    result_parts.append(line)
+                # Si no hemos encontrado herramientas MCP, incluir texto normal
+                # Si ya encontramos herramientas MCP, ignorar texto adicional de Ollama para evitar alucinaciones
+                if not found_mcp_tool and line_clean:
+                    # Solo incluir líneas que no sean prefijos técnicos
+                    if not any(line_clean.startswith(prefix) for prefix in ['🔧', '📊', '🤖', '❌', 'USAR_HERRAMIENTA_MCP']):
+                        result_parts.append(line)
         
         return '\n'.join(result_parts)
     
