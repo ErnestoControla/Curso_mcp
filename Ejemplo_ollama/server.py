@@ -6,9 +6,40 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import logging
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
+# Configurar logging mejorado
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('mcp_server.log', encoding='utf-8')
+    ]
+)
 logger = logging.getLogger(__name__)
+
+# Log de inicio del servidor
+logger.info("🚀 Iniciando servidor MCP de análisis de base de datos")
+
+# Decorator para manejo de errores consistente
+def handle_mcp_errors(func):
+    """Decorator para manejo consistente de errores en herramientas MCP"""
+    def wrapper(*args, **kwargs):
+        try:
+            logger.debug(f"🔧 Ejecutando herramienta MCP: {func.__name__} con args: {args[:2]}")
+            result = func(*args, **kwargs)
+            if isinstance(result, dict) and result.get("success", True):
+                logger.debug(f"✅ Herramienta {func.__name__} ejecutada exitosamente")
+            else:
+                logger.warning(f"⚠️  Herramienta {func.__name__} retornó error: {result.get('error', 'Error desconocido')}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Error en herramienta {func.__name__}: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Error interno en {func.__name__}: {str(e)}",
+                "timestamp": datetime.now().isoformat()
+            }
+    return wrapper
 
 # Create an MCP server
 mcp = FastMCP("MariaDB_Analytics_Server")
@@ -22,16 +53,63 @@ DB_CONFIG = {
     'autocommit': True
 }
 
+def validate_sql_query(query: str) -> tuple[bool, str]:
+    """Validar consulta SQL para prevenir inyección y comandos peligrosos"""
+    query_upper = query.strip().upper()
+    
+    # Lista de comandos prohibidos (más específica)
+    forbidden_commands = [
+        'DROP', 'DELETE', 'UPDATE', 'INSERT', 'CREATE', 'ALTER', 
+        'TRUNCATE', 'GRANT', 'REVOKE', 'EXEC', 'EXECUTE', 'CALL',
+        'LOAD_FILE', 'INTO OUTFILE', 'INTO DUMPFILE'
+    ]
+    
+    # Patrones de UNION peligrosos (permite UNION en subconsultas legítimas)
+    dangerous_patterns = [
+        'UNION ALL SELECT', 'UNION SELECT', ') UNION', '/* UNION'
+    ]
+    
+    # Verificar comandos prohibidos
+    for cmd in forbidden_commands:
+        if cmd in query_upper:
+            return False, f"Comando prohibido detectado: {cmd}"
+    
+    # Verificar patrones peligrosos de UNION
+    for pattern in dangerous_patterns:
+        if pattern in query_upper:
+            return False, f"Patrón peligroso detectado: {pattern}"
+    
+    # Debe empezar con SELECT
+    if not query_upper.startswith('SELECT'):
+        return False, "Solo se permiten consultas SELECT"
+    
+    # Validar caracteres peligrosos específicos
+    dangerous_chars = [';', '--', 'xp_', 'sp_']
+    for char in dangerous_chars:
+        if char in query.lower():
+            return False, f"Caracter o patrón peligroso detectado: {char}"
+    
+    # Permitir comentarios SQL básicos pero no en posiciones peligrosas
+    if query.strip().endswith('--') or query.strip().startswith('--'):
+        return False, "Comentarios SQL en posiciones peligrosas no permitidos"
+    
+    return True, "Consulta válida"
+
 def get_db_connection(database: str = None):
     """Crear conexión a la base de datos"""
     config = DB_CONFIG.copy()
     if database:
         config['database'] = database
+        logger.debug(f"Conectando a base de datos específica: {database}")
+    else:
+        logger.debug("Conectando a servidor MariaDB sin seleccionar base de datos")
+    
     try:
         connection = pymysql.connect(**config)
+        logger.debug(f"✅ Conexión exitosa a {config['host']}")
         return connection
     except Exception as e:
-        logger.error(f"Error connecting to database: {e}")
+        logger.error(f"❌ Error conectando a base de datos {config['host']}: {e}")
         raise
 
 
@@ -119,17 +197,20 @@ def describe_table(database: str, table: str) -> Dict[str, Any]:
 @mcp.tool()
 def execute_query(database: str, query: str, limit: int = 100) -> Dict[str, Any]:
     """Ejecutar una consulta SELECT en la base de datos con límite de resultados"""
+    logger.info(f"🔍 Ejecutando consulta en base de datos '{database}': {query[:100]}...")
     try:
-        # Validar que sea una consulta SELECT
-        query_upper = query.strip().upper()
-        if not query_upper.startswith('SELECT'):
+        # Validación de seguridad SQL
+        is_valid, validation_msg = validate_sql_query(query)
+        if not is_valid:
+            logger.warning(f"⚠️  Consulta SQL rechazada por seguridad: {validation_msg}")
             return {
                 "success": False,
-                "error": "Solo se permiten consultas SELECT por seguridad",
+                "error": f"Consulta rechazada por seguridad: {validation_msg}",
                 "timestamp": datetime.now().isoformat()
             }
         
         # Agregar LIMIT si no existe
+        query_upper = query.strip().upper()
         if 'LIMIT' not in query_upper:
             query += f" LIMIT {limit}"
         
@@ -174,6 +255,7 @@ def execute_query(database: str, query: str, limit: int = 100) -> Dict[str, Any]
 @mcp.tool()
 def test_connection() -> Dict[str, Any]:
     """Probar la conexión a la base de datos MariaDB"""
+    logger.info("🔍 Probando conexión a la base de datos MariaDB")
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
