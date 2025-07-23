@@ -14,6 +14,7 @@ class OllamaMCPClient:
         self.model = model
         self.mcp_process = None
         self.conversation_history = []
+        self.debug_mode = True  # Activar debug para ver herramientas ejecutándose
         
     def start_mcp_server(self):
         """Iniciar el servidor MCP en un proceso separado"""
@@ -131,6 +132,34 @@ class OllamaMCPClient:
                     kwargs.get("search_term"),
                     kwargs.get("table_hint")
                 )
+            # === NUEVAS HERRAMIENTAS DE ASISTENCIA ===
+            elif tool_name == "generate_attendance_query":
+                from server import generate_attendance_query
+                return generate_attendance_query(
+                    kwargs.get("database"),
+                    kwargs.get("analysis_type"),
+                    kwargs.get("date_from"),
+                    kwargs.get("date_to"),
+                    kwargs.get("user_filter")
+                )
+            elif tool_name == "execute_attendance_analysis":
+                from server import execute_attendance_analysis
+                return execute_attendance_analysis(
+                    kwargs.get("database"),
+                    kwargs.get("analysis_type"),
+                    kwargs.get("date_from"),
+                    kwargs.get("date_to"),
+                    kwargs.get("user_filter")
+                )
+            elif tool_name == "validate_attendance_data":
+                from server import validate_attendance_data
+                return validate_attendance_data(
+                    kwargs.get("database"),
+                    kwargs.get("data_issues")
+                )
+            elif tool_name == "create_attendance_kpis":
+                from server import create_attendance_kpis
+                return create_attendance_kpis(kwargs.get("database"))
             else:
                 return {"success": False, "error": f"Herramienta '{tool_name}' no encontrada"}
                 
@@ -271,7 +300,11 @@ class OllamaMCPClient:
 - Asistente proactivo que explora los datos para responder preguntas
 - NO eres solo un consultor, TIENES y DEBES usar las herramientas disponibles
 
+❗ REGLA CRÍTICA: NUNCA INVENTES DATOS. Siempre usa las herramientas para obtener información real.
+
 🔧 HERRAMIENTAS DISPONIBLES (úsalas activamente):
+
+📊 HERRAMIENTAS GENERALES:
 1. test_connection() - Verificar conexión a la base de datos
 2. list_databases() - Listar todas las bases de datos disponibles
 3. list_tables(database) - Listar tablas en una base de datos específica
@@ -281,7 +314,13 @@ class OllamaMCPClient:
 7. get_database_overview(database) - Resumen completo de una base de datos
 8. compare_tables(database, table1, table2) - Comparar dos tablas
 9. analyze_data_distribution(database, table, column) - Analizar distribución de datos
-10. smart_search_person(database, search_term, table_hint) - Búsqueda inteligente de personas usando múltiples estrategias
+10. smart_search_person(database, search_term, table_hint) - Búsqueda inteligente de personas
+
+🎯 HERRAMIENTAS ESPECIALIZADAS DE ASISTENCIA:
+11. generate_attendance_query(database, analysis_type, date_from, date_to, user_filter) - Genera consultas SQL para análisis de asistencia
+12. execute_attendance_analysis(database, analysis_type, date_from, date_to, user_filter) - Ejecuta análisis completos de asistencia
+13. validate_attendance_data(database, data_issues) - Valida calidad de datos de asistencia
+14. create_attendance_kpis(database) - Calcula KPIs de asistencia organizacionales
 
 🚀 ESTRATEGIA DE TRABAJO:
 1. SIEMPRE comienza explorando la estructura (list_databases, list_tables, describe_table)
@@ -315,18 +354,27 @@ Para buscar personas por nombre, usa la herramienta smart_search_person que:
 - Búsqueda fonética: SELECT * FROM usuarios WHERE SOUNDEX(nombre) = SOUNDEX('Sergio')
 
 🎯 REGLAS IMPORTANTES:
+- ❗ NUNCA INVENTES DATOS - Siempre usa herramientas para obtener información real
+- ❗ NO digas nombres de bases de datos o tablas si no las has consultado primero
 - NUNCA digas "no puedo acceder" - SÍ PUEDES usar las herramientas
 - SIEMPRE usa las herramientas antes de responder sobre datos
-- Si no sabes qué base de datos usar, lista todas primero
+- Si no sabes qué base de datos usar, ejecuta list_databases() primero
 - Para nombres parciales, usa búsquedas flexibles con LIKE
 - Explica QUÉ encontraste y QUÉ significa para el usuario
 - Responde SIEMPRE en español
 
-Formato para usar herramientas:
+📝 PARA ANÁLISIS DE ASISTENCIA específicamente:
+- Usa execute_attendance_analysis() para análisis completos
+- Tipos disponibles: daily_summary, late_arrivals, missing_exits, user_pattern, device_usage, hourly_distribution
+- Para KPIs organizacionales usa create_attendance_kpis()
+- Para validar datos usa validate_attendance_data()
+
+Formato EXACTO para usar herramientas:
 USAR_HERRAMIENTA: nombre_herramienta(parametro1="valor1", parametro2="valor2")
 
 Ejemplos:
 USAR_HERRAMIENTA: list_databases()
+USAR_HERRAMIENTA: execute_attendance_analysis(database="asistencia", analysis_type="daily_summary")
 USAR_HERRAMIENTA: smart_search_person(database="usuarios", search_term="Sergio Saucedo")
 USAR_HERRAMIENTA: execute_query(database="ventas", query="SELECT COUNT(*) FROM productos WHERE categoria = 'electronicos'")"""
 
@@ -338,30 +386,59 @@ USAR_HERRAMIENTA: execute_query(database="ventas", query="SELECT COUNT(*) FROM p
         result_parts = []
         
         for line in lines:
-            if line.strip().startswith('USAR_HERRAMIENTA:'):
-                tool_call = line.replace('USAR_HERRAMIENTA:', '').strip()
+            # Detectar herramientas con múltiples formatos posibles
+            line_clean = line.strip()
+            tool_call = None
+            
+            # Patrón 1: USAR_HERRAMIENTA: function()
+            if 'USAR_HERRAMIENTA:' in line_clean:
+                tool_call = line_clean.split('USAR_HERRAMIENTA:', 1)[1].strip()
+                # Remover markdown si existe
+                tool_call = tool_call.replace('**', '').strip()
+                
+            # Patrón 2: **USAR_HERRAMIENTA: function()**
+            elif line_clean.startswith('**USAR_HERRAMIENTA:') and line_clean.endswith('**'):
+                tool_call = line_clean.replace('**USAR_HERRAMIENTA:', '').replace('**', '').strip()
+            
+            if tool_call:
                 try:
-                    # Parsear la llamada a la herramienta
+                    if self.debug_mode:
+                        print(f"\n🔧 EJECUTANDO HERRAMIENTA: {tool_call}")
+                    
+                    # Parsear y ejecutar la herramienta
                     tool_result = self.parse_and_execute_tool(tool_call)
+                    
+                    if self.debug_mode:
+                        print(f"✅ Herramienta ejecutada exitosamente")
+                        print(f"📊 Datos obtenidos: {len(str(tool_result))} caracteres")
                     
                     # Agregar resultado al contexto
                     result_parts.append(f"🔧 Ejecutando: {tool_call}")
-                    result_parts.append(f"📊 Resultado: {json.dumps(tool_result, indent=2, ensure_ascii=False)}")
+                    result_parts.append(f"📊 Resultado:")
+                    result_parts.append(json.dumps(tool_result, indent=2, ensure_ascii=False))
                     
-                    # Continuar el análisis con el resultado
-                    follow_up_prompt = f"""
-Resultado de la herramienta {tool_call}:
+                    # Si la herramienta fue exitosa, continuar el análisis
+                    if tool_result.get("success", False):
+                        follow_up_prompt = f"""
+La herramienta {tool_call} se ejecutó exitosamente con este resultado:
 {json.dumps(tool_result, indent=2, ensure_ascii=False)}
 
-Continúa tu análisis basándote en este resultado. Si necesitas más información, solicita otras herramientas.
+Basándote en este resultado real, proporciona una respuesta clara y útil al usuario. Si necesitas ejecutar más herramientas para completar el análisis, hazlo.
 """
-                    follow_up_response = self.call_ollama(follow_up_prompt)
-                    result_parts.append(f"🤖 Análisis: {follow_up_response}")
+                        follow_up_response = self.call_ollama(follow_up_prompt)
+                        result_parts.append(f"\n🤖 Análisis de resultados:")
+                        result_parts.append(follow_up_response)
+                    else:
+                        result_parts.append(f"❌ Error en la herramienta: {tool_result.get('error', 'Error desconocido')}")
                     
                 except Exception as e:
                     result_parts.append(f"❌ Error ejecutando {tool_call}: {e}")
+                    print(f"Error detallado: {e}")
             else:
-                if line.strip() and not any(line.strip().startswith(prefix) for prefix in ['🔧', '📊', '🤖', '❌']):
+                # Solo agregar líneas que no sean de herramientas fallidas
+                if (line_clean and 
+                    not any(line_clean.startswith(prefix) for prefix in ['🔧', '📊', '🤖', '❌']) and
+                    'USAR_HERRAMIENTA' not in line_clean):
                     result_parts.append(line)
         
         return '\n'.join(result_parts)
@@ -420,15 +497,19 @@ Continúa tu análisis basándote en este resultado. Si necesitas más informaci
             print(f"   {connection_test.get('error', 'Error desconocido')}")
         
         print("\n💡 Ejemplos de preguntas que puedes hacer:")
-        print("  🗂️  ¿Qué bases de datos hay disponibles?")
-        print("  📊 Analiza la tabla usuarios en la base de datos tienda")
-        print("  🔍 Busca información de Sergio Saucedo (búsqueda inteligente)")
-        print("  📈 ¿Cuáles son las métricas de la tabla ventas?")
-        print("  🏆 Muéstrame los 10 productos más vendidos")
-        print("  ⚖️  Compara las estructuras de las tablas productos y categorías")
-        print("  📋 Dame un resumen completo de la base de datos 'tienda'")
-        print("  👤 Encuentra todos los usuarios con nombre 'María'")
-        print("  📊 ¿Cuál es la distribución de precios en productos?")
+        print("   📊 General:")
+        print("     - ¿Qué bases de datos tienes disponibles?")
+        print("     - Muéstrame las tablas de la base de datos X")
+        print("     - Analiza la tabla Y en la base de datos Z")
+        print("   🎯 Análisis de Asistencia:")
+        print("     - Muéstrame un resumen diario de asistencia")
+        print("     - ¿Quiénes llegaron tarde esta semana?")
+        print("     - Calcula los KPIs de asistencia")
+        print("     - Encuentra registros duplicados en asistencia")
+        print("     - Analiza el patrón de asistencia por usuario")
+        print("   🔍 Búsquedas:")
+        print("     - Busca información de [nombre] (búsqueda inteligente)")
+        print("     - Encuentra todos los usuarios con nombre 'María'")
         print("\n" + "=" * 60)
         
         while True:

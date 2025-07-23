@@ -491,6 +491,411 @@ def analyze_data_distribution(database: str, table: str, column: str, bins: int 
         }
 
 
+# ===== HERRAMIENTAS ESPECIALIZADAS PARA ANÁLISIS DE ASISTENCIA =====
+
+@mcp.tool()
+def generate_attendance_query(database: str, analysis_type: str, date_from: str = None, date_to: str = None, user_filter: str = None) -> Dict[str, Any]:
+    """
+    Genera consultas SQL optimizadas para análisis de asistencia específicos.
+    
+    database: Base de datos que contiene la tabla core_registro
+    analysis_type: 'daily_summary', 'late_arrivals', 'missing_exits', 'user_pattern', 'device_usage', 'hourly_distribution'
+    date_from: Fecha inicio en formato YYYY-MM-DD
+    date_to: Fecha fin en formato YYYY-MM-DD  
+    user_filter: Filtro por nombre o código de usuario
+    """
+    try:
+        base_conditions = []
+        if date_from:
+            base_conditions.append(f"tiempo >= '{date_from} 00:00:00'")
+        if date_to:
+            base_conditions.append(f"tiempo <= '{date_to} 23:59:59'")
+        if user_filter:
+            base_conditions.append(f"(nombre LIKE '%{user_filter}%' OR codigo_usuario LIKE '%{user_filter}%')")
+        
+        where_clause = " AND ".join(base_conditions) if base_conditions else "1=1"
+        
+        queries = {
+            "daily_summary": f"""
+                SELECT 
+                    DATE(tiempo) as fecha,
+                    COUNT(*) as total_registros,
+                    COUNT(DISTINCT usuario_id) as usuarios_unicos,
+                    COUNT(CASE WHEN evento = 'entrada' THEN 1 END) as entradas,
+                    COUNT(CASE WHEN evento = 'salida' THEN 1 END) as salidas
+                FROM core_registro 
+                WHERE {where_clause}
+                GROUP BY DATE(tiempo)
+                ORDER BY fecha DESC;
+            """,
+            
+            "late_arrivals": f"""
+                SELECT 
+                    nombre, codigo_usuario, 
+                    DATE(tiempo) as fecha,
+                    TIME(tiempo) as hora_llegada,
+                    lugar, dispositivo
+                FROM core_registro 
+                WHERE evento = 'entrada' 
+                    AND TIME(tiempo) > '08:30:00'
+                    AND {where_clause}
+                ORDER BY tiempo DESC;
+            """,
+            
+            "missing_exits": f"""
+                SELECT DISTINCT
+                    r1.nombre, r1.codigo_usuario,
+                    DATE(r1.tiempo) as fecha,
+                    TIME(r1.tiempo) as hora_entrada
+                FROM core_registro r1
+                WHERE r1.evento = 'entrada' 
+                    AND {where_clause.replace('tiempo', 'r1.tiempo')}
+                    AND NOT EXISTS (
+                        SELECT 1 FROM core_registro r2 
+                        WHERE r2.usuario_id = r1.usuario_id 
+                            AND r2.evento = 'salida'
+                            AND DATE(r2.tiempo) = DATE(r1.tiempo)
+                            AND r2.tiempo > r1.tiempo
+                    )
+                ORDER BY r1.tiempo DESC;
+            """,
+            
+            "user_pattern": f"""
+                SELECT 
+                    nombre, codigo_usuario,
+                    COUNT(*) as total_registros,
+                    MIN(tiempo) as primer_registro,
+                    MAX(tiempo) as ultimo_registro,
+                    COUNT(DISTINCT DATE(tiempo)) as dias_activos,
+                    AVG(CASE WHEN evento = 'entrada' THEN HOUR(tiempo) + MINUTE(tiempo)/60.0 END) as hora_promedio_entrada
+                FROM core_registro 
+                WHERE {where_clause}
+                GROUP BY usuario_id, nombre, codigo_usuario
+                ORDER BY total_registros DESC;
+            """,
+            
+            "device_usage": f"""
+                SELECT 
+                    dispositivo,
+                    lugar,
+                    COUNT(*) as total_usos,
+                    COUNT(DISTINCT usuario_id) as usuarios_distintos,
+                    DATE(MIN(tiempo)) as primer_uso,
+                    DATE(MAX(tiempo)) as ultimo_uso
+                FROM core_registro 
+                WHERE {where_clause}
+                GROUP BY dispositivo, lugar
+                ORDER BY total_usos DESC;
+            """,
+            
+            "hourly_distribution": f"""
+                SELECT 
+                    HOUR(tiempo) as hora,
+                    evento,
+                    COUNT(*) as cantidad,
+                    COUNT(DISTINCT usuario_id) as usuarios_unicos
+                FROM core_registro 
+                WHERE {where_clause}
+                GROUP BY HOUR(tiempo), evento
+                ORDER BY hora, evento;
+            """
+        }
+        
+        if analysis_type not in queries:
+            return {
+                "success": False,
+                "error": f"Tipo de análisis no válido. Opciones: {', '.join(queries.keys())}",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        return {
+            "success": True,
+            "database": database,
+            "query": queries[analysis_type].strip(),
+            "description": f"Consulta para {analysis_type}",
+            "filters_applied": {
+                "date_from": date_from,
+                "date_to": date_to, 
+                "user_filter": user_filter
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+@mcp.tool()
+def execute_attendance_analysis(database: str, analysis_type: str, date_from: str = None, date_to: str = None, user_filter: str = None) -> Dict[str, Any]:
+    """
+    Ejecuta directamente un análisis de asistencia y devuelve los resultados.
+    
+    database: Base de datos que contiene la tabla core_registro
+    analysis_type: Tipo de análisis a ejecutar
+    date_from, date_to, user_filter: Filtros opcionales
+    """
+    try:
+        # Primero obtenemos la consulta
+        query_result = generate_attendance_query(database, analysis_type, date_from, date_to, user_filter)
+        
+        if not query_result.get("success"):
+            return query_result
+        
+        query = query_result["query"]
+        
+        # Ejecutamos la consulta
+        with get_db_connection(database) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+                
+                # Convertir resultados a formato JSON serializable
+                results = []
+                for row in rows:
+                    row_dict = {}
+                    for i, col in enumerate(columns):
+                        value = row[i]
+                        if isinstance(value, datetime):
+                            value = value.isoformat()
+                        elif hasattr(value, 'isoformat'):
+                            value = value.isoformat()
+                        row_dict[col] = value
+                    results.append(row_dict)
+                
+                return {
+                    "success": True,
+                    "database": database,
+                    "analysis_type": analysis_type,
+                    "filters_applied": query_result["filters_applied"],
+                    "columns": columns,
+                    "results": results,
+                    "row_count": len(results),
+                    "executed_query": query,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "database": database,
+            "analysis_type": analysis_type,
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+@mcp.tool()
+def validate_attendance_data(database: str, data_issues: str) -> Dict[str, Any]:
+    """
+    Ejecuta validaciones para identificar problemas en los datos de asistencia.
+    
+    database: Base de datos que contiene la tabla core_registro
+    data_issues: 'duplicates', 'same_time_events', 'invalid_sequences', 'time_gaps'
+    """
+    try:
+        validation_queries = {
+            "duplicates": """
+                SELECT usuario_id, nombre, tiempo, evento, COUNT(*) as duplicados
+                FROM core_registro 
+                GROUP BY usuario_id, tiempo, evento
+                HAVING COUNT(*) > 1
+                ORDER BY duplicados DESC;
+            """,
+            
+            "same_time_events": """
+                SELECT r1.nombre, r1.tiempo, r1.evento as evento1, r2.evento as evento2,
+                       r1.lugar, r1.dispositivo
+                FROM core_registro r1
+                JOIN core_registro r2 ON r1.usuario_id = r2.usuario_id 
+                    AND r1.tiempo = r2.tiempo 
+                    AND r1.id != r2.id
+                ORDER BY r1.tiempo DESC;
+            """,
+            
+            "invalid_sequences": """
+                SELECT r1.nombre, r1.codigo_usuario,
+                       r1.tiempo as evento1_tiempo, r1.evento as evento1,
+                       r2.tiempo as evento2_tiempo, r2.evento as evento2
+                FROM core_registro r1
+                JOIN core_registro r2 ON r1.usuario_id = r2.usuario_id
+                WHERE r1.evento = r2.evento 
+                    AND r2.tiempo > r1.tiempo
+                    AND NOT EXISTS (
+                        SELECT 1 FROM core_registro r3 
+                        WHERE r3.usuario_id = r1.usuario_id 
+                            AND r3.tiempo > r1.tiempo 
+                            AND r3.tiempo < r2.tiempo
+                    )
+                ORDER BY r1.tiempo DESC
+                LIMIT 50;
+            """,
+            
+            "time_gaps": """
+                SELECT 
+                    r1.nombre, r1.codigo_usuario,
+                    DATE(r1.tiempo) as fecha,
+                    r1.tiempo as entrada,
+                    r2.tiempo as salida,
+                    TIMESTAMPDIFF(HOUR, r1.tiempo, r2.tiempo) as horas_diferencia
+                FROM core_registro r1
+                JOIN core_registro r2 ON r1.usuario_id = r2.usuario_id
+                    AND DATE(r1.tiempo) = DATE(r2.tiempo)
+                    AND r1.evento = 'entrada' 
+                    AND r2.evento = 'salida'
+                    AND r2.tiempo > r1.tiempo
+                WHERE TIMESTAMPDIFF(HOUR, r1.tiempo, r2.tiempo) > 12
+                    OR TIMESTAMPDIFF(MINUTE, r1.tiempo, r2.tiempo) < 30
+                ORDER BY horas_diferencia DESC
+                LIMIT 50;
+            """
+        }
+        
+        if data_issues not in validation_queries:
+            return {
+                "success": False,
+                "error": f"Tipo de validación no válido. Opciones: {', '.join(validation_queries.keys())}",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        query = validation_queries[data_issues]
+        
+        with get_db_connection(database) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+                
+                # Convertir resultados
+                results = []
+                for row in rows:
+                    row_dict = {}
+                    for i, col in enumerate(columns):
+                        value = row[i]
+                        if isinstance(value, datetime):
+                            value = value.isoformat()
+                        elif hasattr(value, 'isoformat'):
+                            value = value.isoformat()
+                        row_dict[col] = value
+                    results.append(row_dict)
+                
+                return {
+                    "success": True,
+                    "database": database,
+                    "validation_type": data_issues,
+                    "columns": columns,
+                    "issues_found": results,
+                    "issue_count": len(results),
+                    "executed_query": query.strip(),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "database": database,
+            "validation_type": data_issues,
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+@mcp.tool()
+def create_attendance_kpis(database: str) -> Dict[str, Any]:
+    """
+    Calcula KPIs (indicadores clave) de asistencia para los últimos 30 días.
+    
+    database: Base de datos que contiene la tabla core_registro
+    """
+    try:
+        kpi_results = {}
+        
+        with get_db_connection(database) as conn:
+            with conn.cursor() as cursor:
+                
+                # 1. Tasa de puntualidad
+                cursor.execute("""
+                    SELECT 
+                        COUNT(CASE WHEN TIME(tiempo) <= '08:30:00' THEN 1 END) as puntuales,
+                        COUNT(CASE WHEN evento = 'entrada' THEN 1 END) as total_entradas
+                    FROM core_registro 
+                    WHERE tiempo >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        AND evento = 'entrada';
+                """)
+                punctuality = cursor.fetchone()
+                
+                if punctuality and punctuality[1] > 0:
+                    punctuality_rate = round((punctuality[0] / punctuality[1]) * 100, 2)
+                    kpi_results["punctuality_rate"] = {
+                        "percentage": punctuality_rate,
+                        "punctual_arrivals": punctuality[0],
+                        "total_arrivals": punctuality[1]
+                    }
+                
+                # 2. Promedio de horas trabajadas
+                cursor.execute("""
+                    SELECT AVG(horas_trabajadas) as promedio_horas
+                    FROM (
+                        SELECT 
+                            TIMESTAMPDIFF(MINUTE, r1.tiempo, r2.tiempo) / 60.0 as horas_trabajadas
+                        FROM core_registro r1
+                        JOIN core_registro r2 ON r1.usuario_id = r2.usuario_id
+                            AND DATE(r1.tiempo) = DATE(r2.tiempo)
+                            AND r1.evento = 'entrada' 
+                            AND r2.evento = 'salida'
+                            AND r2.tiempo > r1.tiempo
+                        WHERE r1.tiempo >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                    ) horas_diarias;
+                """)
+                avg_hours = cursor.fetchone()
+                
+                if avg_hours and avg_hours[0]:
+                    kpi_results["average_work_hours"] = round(float(avg_hours[0]), 2)
+                
+                # 3. Días con registros de asistencia
+                cursor.execute("""
+                    SELECT COUNT(DISTINCT DATE(tiempo)) as dias_activos
+                    FROM core_registro 
+                    WHERE tiempo >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                        AND evento = 'entrada';
+                """)
+                active_days = cursor.fetchone()
+                
+                if active_days:
+                    kpi_results["active_days_last_30"] = active_days[0]
+                
+                # 4. Usuarios únicos activos
+                cursor.execute("""
+                    SELECT COUNT(DISTINCT usuario_id) as usuarios_activos
+                    FROM core_registro 
+                    WHERE tiempo >= DATE_SUB(CURDATE(), INTERVAL 30 DAY);
+                """)
+                active_users = cursor.fetchone()
+                
+                if active_users:
+                    kpi_results["active_users_last_30"] = active_users[0]
+                
+                return {
+                    "success": True,
+                    "database": database,
+                    "period": "Últimos 30 días",
+                    "kpis": kpi_results,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "database": database,
+            "timestamp": datetime.now().isoformat()
+        }
+
+
 # Recursos para información del servidor
 @mcp.resource("mariadb://connection_info")
 def get_connection_info() -> str:
@@ -503,6 +908,68 @@ def get_connection_info() -> str:
         "password": "***"
     }
     return json.dumps(safe_config, indent=2)
+
+
+@mcp.resource("attendance://schema")
+def get_attendance_schema() -> str:
+    """Obtiene el esquema de la tabla core_registro para análisis de asistencia"""
+    schema = {
+        "core_registro": {
+            "id": "BIGINT PRIMARY KEY AUTO_INCREMENT",
+            "tiempo": "DATETIME(6) - Fecha y hora del registro",
+            "lugar": "VARCHAR(100) - Ubicación del registro",
+            "dispositivo": "VARCHAR(100) - Dispositivo usado para el registro",
+            "punto_evento": "VARCHAR(100) - Punto donde ocurrió el evento",
+            "verificacion": "VARCHAR(100) - Método de verificación usado",
+            "evento": "VARCHAR(100) - Tipo de evento (entrada/salida)",
+            "estado_id": "BIGINT FK - Referencia a core_estado",
+            "usuario_id": "BIGINT FK - Referencia a core_usuario", 
+            "nombre": "VARCHAR(255) - Nombre del usuario",
+            "codigo_usuario": "VARCHAR(100) - Código identificador del usuario"
+        }
+    }
+    return json.dumps(schema, indent=2)
+
+
+@mcp.resource("attendance://help")
+def get_attendance_help() -> str:
+    """Guía de uso para las herramientas de análisis de asistencia"""
+    help_text = """
+    HERRAMIENTAS DE ANÁLISIS DE ASISTENCIA
+    
+    1. generate_attendance_query: Genera consultas SQL para análisis específicos
+       - daily_summary: Resumen diario de registros
+       - late_arrivals: Llegadas tardías (después de 8:30 AM)
+       - missing_exits: Entradas sin salida correspondiente
+       - user_pattern: Patrones de comportamiento por usuario
+       - device_usage: Análisis de uso de dispositivos/lugares
+       - hourly_distribution: Distribución por horas del día
+       
+    2. execute_attendance_analysis: Ejecuta análisis y devuelve resultados
+       - Combina generate_attendance_query + execute_query
+       - Devuelve datos formateados listos para usar
+       
+    3. validate_attendance_data: Validación de calidad de datos
+       - duplicates: Registros duplicados
+       - same_time_events: Eventos simultáneos (posibles errores)
+       - invalid_sequences: Secuencias inválidas (doble entrada, etc.)
+       - time_gaps: Gaps de tiempo inusuales
+       
+    4. create_attendance_kpis: Calcula KPIs organizacionales
+       - Tasa de puntualidad
+       - Promedio de horas trabajadas
+       - Días activos y usuarios únicos
+    
+    FILTROS DISPONIBLES:
+    - date_from/date_to: Rango de fechas (YYYY-MM-DD)
+    - user_filter: Filtro por nombre o código de usuario
+    
+    EJEMPLOS DE USO:
+    - execute_attendance_analysis("mi_db", "daily_summary", "2024-01-01", "2024-01-31")
+    - validate_attendance_data("mi_db", "duplicates")
+    - create_attendance_kpis("mi_db")
+    """
+    return help_text
 
 
 @mcp.resource("mariadb://status")
