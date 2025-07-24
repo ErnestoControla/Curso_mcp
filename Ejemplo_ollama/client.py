@@ -11,7 +11,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 class OllamaMCPClient:
-    def __init__(self, ollama_host: str = "localhost", ollama_port: int = 11434, model: str = "llama3.1:8b"):
+    def __init__(self, ollama_host: str = "localhost", ollama_port: int = 11434, model: str = "gemma3:12b"):
         self.ollama_base_url = f"http://{ollama_host}:{ollama_port}"
         self.model = model
         self.mcp_session = None
@@ -171,61 +171,53 @@ class OllamaMCPClient:
         """Analizar una pregunta y ejecutar las herramientas necesarias usando IA con contexto de asistencia laboral"""
         
         # System prompt especializado para análisis de asistencia laboral
-        system_prompt = f"""Eres un ASISTENTE ESPECIALIZADO EN ANÁLISIS DE ASISTENCIA LABORAL.
+        system_prompt = f"""ERES UN SISTEMA AUTOMATIZADO DE CONSULTAS SQL. DEBES RESPONDER SOLO CON COMANDOS EJECUTABLES.
 
-ESTRUCTURA REAL DE LA BASE DE DATOS:
-- Base de datos: "zapopan" 
-- Tabla core_usuario: id, nombre, codigo_usuario (SIN apellido)
-- Tabla core_registro: id, tiempo, lugar, dispositivo, usuario_id, nombre, codigo_usuario
-- IMPORTANTE: core_registro YA CONTIENE el campo 'nombre', NO necesitas JOIN siempre
-- Horario laboral: Lunes a Viernes
-- Retardo: Después de las 08:10:00 AM
+IMPORTANTE: Para CUALQUIER pregunta sobre asistencia, responde ÚNICAMENTE con comandos USAR_HERRAMIENTA_MCP.
 
-REGLAS SQL OBLIGATORIAS:
-1. Para detectar retardos: TIME(tiempo) > TIME('08:10:00')
-2. Para análisis de puntualidad: TIME(tiempo) <= TIME('08:10:00')
-3. Para "hoy": DATE(tiempo) = CURDATE()
-4. Para "esta semana": DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
-5. USA core_registro directamente (ya tiene el nombre)
-6. Solo USA JOIN si necesitas datos específicos de core_usuario
+BASE DE DATOS: zapopan - Tabla: core_registro
+CAMPOS: id, tiempo, nombre, estado_id, usuario_id
+REGLAS: estado_id=1 (Entrada), estado_id=2 (Salida), Retardo >08:10:00, Solo días laborales WEEKDAY<5
 
-PATRONES DE CONSULTA CORREGIDOS:
+RESPUESTAS OBLIGATORIAS:
 
-Para "¿Quién se registró hoy?":
-USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre, tiempo FROM core_registro WHERE DATE(tiempo) = CURDATE() ORDER BY tiempo")
+Para "¿Quién se registró hoy?" o "¿Quién vino hoy?":
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre FROM core_registro WHERE DATE(tiempo) = CURDATE() AND estado_id = 1 LIMIT 20")
 
-Para "¿Quién llegó tarde esta semana?":
-USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre, tiempo, TIME(tiempo) as hora FROM core_registro WHERE DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) AND TIME(tiempo) > TIME('08:10:00') ORDER BY tiempo")
+Para "¿Quién llegó tarde hoy?":
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre FROM core_registro WHERE estado_id = 1 AND TIME(tiempo) > '08:10:00' AND TIME(tiempo) < '12:00:00' AND DATE(tiempo) = CURDATE() LIMIT 20")
 
 Para "¿Cuántos retardos hubo hoy?":
-USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT COUNT(*) as total_retardos FROM core_registro WHERE DATE(tiempo) = CURDATE() AND TIME(tiempo) > TIME('08:10:00')")
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT COUNT(*) as total_retardos FROM core_registro WHERE estado_id = 1 AND TIME(tiempo) > '08:10:00' AND TIME(tiempo) < '12:00:00' AND DATE(tiempo) = CURDATE() LIMIT 1")
 
-Para "Métricas semanales de asistencia":
-USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT COUNT(*) as total_registros, COUNT(DISTINCT usuario_id) as personas_distintas, SUM(CASE WHEN TIME(tiempo) > TIME('08:10:00') THEN 1 ELSE 0 END) as retardos, SUM(CASE WHEN TIME(tiempo) <= TIME('08:10:00') THEN 1 ELSE 0 END) as puntuales FROM core_registro WHERE DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)")
+Para "¿Quién llegó tarde esta semana?" o "última semana":
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre FROM core_registro WHERE estado_id = 1 AND tiempo > CONCAT(DATE(tiempo), ' 08:10:00') AND DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) LIMIT 20")
 
-Para "¿Cuántas personas vinieron esta semana?":
-USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT COUNT(DISTINCT usuario_id) as personas_distintas, GROUP_CONCAT(DISTINCT nombre SEPARATOR ', ') as nombres FROM core_registro WHERE DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)")
+Para "¿Quiénes se registraron esta semana?" o "última semana":
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT DISTINCT nombre FROM core_registro WHERE estado_id = 1 AND DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) LIMIT 20")
 
-Para "Análisis de puntualidad de [nombre]":
-USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre, DATE(tiempo) as fecha, TIME(tiempo) as hora, CASE WHEN TIME(tiempo) <= TIME('08:10:00') THEN 'Puntual' ELSE 'Retardo' END as estado FROM core_registro WHERE nombre LIKE '%[nombre]%' ORDER BY tiempo DESC LIMIT 10")
+Para análisis de "[nombre]":
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre, DATE(tiempo) as fecha, HOUR(tiempo) as hora, MINUTE(tiempo) as minuto, CASE WHEN TIME(tiempo) <= '08:10:00' THEN 'Puntual' WHEN TIME(tiempo) > '08:10:00' AND TIME(tiempo) < '12:00:00' THEN 'Retardo' ELSE 'Entrada tardía' END as estado FROM core_registro WHERE nombre LIKE '%[nombre]%' AND estado_id = 1 ORDER BY tiempo DESC LIMIT 10")
 
-Para "Lista de llegadas de hoy ordenadas por hora":
-USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre, TIME(tiempo) as hora, CASE WHEN TIME(tiempo) <= TIME('08:10:00') THEN 'Puntual' ELSE 'Retardo' END as estado FROM core_registro WHERE DATE(tiempo) = CURDATE() ORDER BY TIME(tiempo)")
+Para "conteo" o "cuántos registros":
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre, COUNT(*) as total_registros FROM core_registro GROUP BY nombre ORDER BY total_registros DESC LIMIT 10")
 
-ANÁLISIS AVANZADOS:
-- Para KPIs semanales: calcula % puntualidad, promedio hora llegada, distribución por días
-- Para búsquedas de personas: usa LIKE '%nombre%' en el campo nombre de core_registro
-- Para comparaciones: usa intervalos de fechas con DATE_SUB
-- Para estadísticas: usa COUNT, AVG, SUM con CASE WHEN
+Para "conteo de entradas":
+USAR_HERRAMIENTA_MCP: execute_query(database="zapopan", query="SELECT nombre, COUNT(*) as total_entradas FROM core_registro WHERE estado_id = 1 GROUP BY nombre ORDER BY total_entradas DESC LIMIT 10")
 
-REGLAS IMPORTANTES:
-- SIEMPRE usa TIME('08:10:00') en lugar de '08:10:00' para comparaciones de hora
-- El campo 'nombre' está en core_registro, NO necesitas JOIN para obtenerlo
-- Para datos adicionales del usuario usa: SELECT cr.*, cu.codigo_usuario FROM core_registro cr LEFT JOIN core_usuario cu ON cr.usuario_id = cu.id
-- SIEMPRE formatea fechas y horas claramente
-- Para búsquedas flexibles: nombre LIKE '%término%'
+NO DES EXPLICACIONES. NO ESCRIBAS SQL MANUAL. SOLO RESPONDE CON USAR_HERRAMIENTA_MCP.
 
-FORMATO OBLIGATORIO: USAR_HERRAMIENTA_MCP: nombre_herramienta(parametros)"""
+FECHAS IMPORTANTES:
+- Los datos están en 2025, NO en 2024
+- Para "julio" usa: BETWEEN '2025-07-01' AND '2025-07-31'
+- Para "esta semana" usa: DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+- Para "hoy" usa: CURDATE()
+
+EJEMPLOS ADICIONALES:
+- "resumen" → Usa get_weekly_attendance_summary 
+- "métricas" → Usa consultas de conteo y promedios
+- Nombres parciales → Usa LIKE '%nombre%'
+- Fechas específicas → SIEMPRE usa año 2025"""
 
         # Obtener respuesta de la IA
         ai_response = self.call_ollama(question, system_prompt)
@@ -360,42 +352,53 @@ FORMATO OBLIGATORIO: USAR_HERRAMIENTA_MCP: nombre_herramienta(parametros)"""
         try:
             print("\n📊 Generando resumen semanal de asistencia...")
             
-            # Métricas generales de la semana
+            # Métricas generales de la semana (CORREGIDO con estado_id)
             metrics_query = """
             SELECT 
-                COUNT(*) as total_registros,
-                COUNT(DISTINCT usuario_id) as personas_distintas,
-                SUM(CASE WHEN TIME(tiempo) <= TIME('08:10:00') THEN 1 ELSE 0 END) as llegadas_puntuales,
-                SUM(CASE WHEN TIME(tiempo) > TIME('08:10:00') THEN 1 ELSE 0 END) as retardos,
+                COUNT(*) as total_entradas,
+                COUNT(DISTINCT usuario_id) as empleados_distintos,
+                SUM(CASE WHEN TIME(tiempo) <= '08:10:00' THEN 1 ELSE 0 END) as llegadas_puntuales,
+                SUM(CASE WHEN TIME(tiempo) > '08:10:00' AND TIME(tiempo) < '12:00:00' THEN 1 ELSE 0 END) as retardos,
                 MIN(DATE(tiempo)) as primer_dia,
                 MAX(DATE(tiempo)) as ultimo_dia,
-                AVG(TIME_TO_SEC(TIME(tiempo))) as promedio_segundos
+                AVG(TIME_TO_SEC(TIME(tiempo))) as promedio_segundos,
+                AVG(TIMESTAMPDIFF(MINUTE, TIME('08:10:00'), TIME(tiempo))) as promedio_minutos_retardo
             FROM core_registro 
-            WHERE DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+            WHERE estado_id = 1 
+                AND DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+                AND WEEKDAY(tiempo) < 5
+                AND TIME(tiempo) < '12:00:00'
             """
             
-            # Top llegadas más tardías
+            # Top llegadas más tardías (CORREGIDO con estado_id)
             late_arrivals_query = """
             SELECT 
                 nombre, 
                 DATE(tiempo) as fecha,
-                TIME(tiempo) as hora
+                TIME(tiempo) as hora,
+                TIMESTAMPDIFF(MINUTE, TIME('08:10:00'), TIME(tiempo)) as minutos_retardo
             FROM core_registro 
-            WHERE DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) 
-                AND TIME(tiempo) > TIME('08:10:00')
+            WHERE estado_id = 1
+                AND DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) 
+                AND TIME(tiempo) > '08:10:00'
+                AND TIME(tiempo) < '12:00:00'
+                AND WEEKDAY(tiempo) < 5
             ORDER BY TIME(tiempo) DESC 
             LIMIT 5
             """
             
-            # Personas más puntuales
+            # Personas más puntuales (CORREGIDO con estado_id)
             punctual_people_query = """
             SELECT 
                 nombre,
-                COUNT(*) as total_dias,
-                SUM(CASE WHEN TIME(tiempo) <= TIME('08:10:00') THEN 1 ELSE 0 END) as dias_puntuales,
-                ROUND(SUM(CASE WHEN TIME(tiempo) <= TIME('08:10:00') THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as porcentaje_puntualidad
+                COUNT(*) as total_entradas,
+                SUM(CASE WHEN TIME(tiempo) <= '08:10:00' THEN 1 ELSE 0 END) as dias_puntuales,
+                ROUND(SUM(CASE WHEN TIME(tiempo) <= '08:10:00' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as porcentaje_puntualidad
             FROM core_registro 
-            WHERE DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+            WHERE estado_id = 1
+                AND DATE(tiempo) >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+                AND WEEKDAY(tiempo) < 5
+                AND TIME(tiempo) < '12:00:00'
             GROUP BY usuario_id, nombre
             HAVING COUNT(*) >= 2
             ORDER BY porcentaje_puntualidad DESC, dias_puntuales DESC
@@ -422,11 +425,12 @@ FORMATO OBLIGATORIO: USAR_HERRAMIENTA_MCP: nombre_herramienta(parametros)"""
             
             if metrics_result.get("success") and metrics_result.get("results"):
                 metrics = metrics_result["results"][0]
-                total_registros = metrics.get("total_registros", 0)
-                personas_distintas = metrics.get("personas_distintas", 0)
+                total_entradas = metrics.get("total_entradas", 0)
+                empleados_distintos = metrics.get("empleados_distintos", 0)
                 puntuales = metrics.get("llegadas_puntuales", 0)
                 retardos = metrics.get("retardos", 0)
                 promedio_seg = metrics.get("promedio_segundos", 0)
+                promedio_min_retardo = metrics.get("promedio_minutos_retardo", 0)
                 
                 # Convertir promedio de segundos a formato hora
                 if promedio_seg:
@@ -436,15 +440,17 @@ FORMATO OBLIGATORIO: USAR_HERRAMIENTA_MCP: nombre_herramienta(parametros)"""
                 else:
                     promedio_hora = "N/A"
                 
-                porcentaje_puntualidad = (puntuales / total_registros * 100) if total_registros > 0 else 0
+                porcentaje_puntualidad = (puntuales / total_entradas * 100) if total_entradas > 0 else 0
                 
-                summary_parts.append(f"\n📈 **MÉTRICAS GENERALES:**")
-                summary_parts.append(f"• Total de registros: {total_registros}")
-                summary_parts.append(f"• Personas que asistieron: {personas_distintas}")
-                summary_parts.append(f"• Llegadas puntuales: {puntuales} ✅")
-                summary_parts.append(f"• Retardos: {retardos} ⚠️")
+                summary_parts.append(f"\n📈 **MÉTRICAS SEMANALES (SOLO ENTRADAS):**")
+                summary_parts.append(f"• Total de entradas registradas: {total_entradas}")
+                summary_parts.append(f"• Empleados que asistieron: {empleados_distintos}")
+                summary_parts.append(f"• Llegadas puntuales (≤08:10): {puntuales} ✅")
+                summary_parts.append(f"• Retardos (>08:10 y <12:00): {retardos} ⚠️")
                 summary_parts.append(f"• % Puntualidad general: {porcentaje_puntualidad:.1f}%")
                 summary_parts.append(f"• Hora promedio de llegada: {promedio_hora}")
+                if promedio_min_retardo and promedio_min_retardo > 0:
+                    summary_parts.append(f"• Promedio minutos de retardo: {promedio_min_retardo:.1f} min")
                 
                 # Evaluación de rendimiento
                 if porcentaje_puntualidad >= 90:
@@ -456,24 +462,28 @@ FORMATO OBLIGATORIO: USAR_HERRAMIENTA_MCP: nombre_herramienta(parametros)"""
                 else:
                     summary_parts.append(f"• **Evaluación: NECESITA MEJORA** 🚨")
             
-            # Top retardos
+            # Top retardos (ACTUALIZADO con minutos de retardo)
             if late_result.get("success") and late_result.get("results"):
                 summary_parts.append(f"\n⚠️ **TOP 5 LLEGADAS MÁS TARDÍAS:**")
                 for i, late in enumerate(late_result["results"], 1):
                     nombre = late.get('nombre', '')
                     fecha = late.get('fecha', '')
                     hora = late.get('hora', '')
-                    summary_parts.append(f"{i}. {nombre} - {fecha} a las {hora}")
+                    minutos_retardo = late.get('minutos_retardo', 0)
+                    if minutos_retardo:
+                        summary_parts.append(f"{i}. {nombre} - {fecha} a las {hora} (+{minutos_retardo:.0f} min)")
+                    else:
+                        summary_parts.append(f"{i}. {nombre} - {fecha} a las {hora}")
             
-            # Top puntuales
+            # Top puntuales (ACTUALIZADO con nombres de campos corregidos)
             if punctual_result.get("success") and punctual_result.get("results"):
-                summary_parts.append(f"\n✅ **TOP 5 PERSONAS MÁS PUNTUALES:**")
+                summary_parts.append(f"\n✅ **TOP 5 EMPLEADOS MÁS PUNTUALES:**")
                 for i, person in enumerate(punctual_result["results"], 1):
                     nombre = person.get('nombre', '')
                     porcentaje = person.get('porcentaje_puntualidad', 0)
                     dias_puntuales = person.get('dias_puntuales', 0)
-                    total_dias = person.get('total_dias', 0)
-                    summary_parts.append(f"{i}. {nombre} - {porcentaje}% ({dias_puntuales}/{total_dias} días)")
+                    total_entradas = person.get('total_entradas', 0)
+                    summary_parts.append(f"{i}. {nombre} - {porcentaje}% ({dias_puntuales}/{total_entradas} entradas)")
             
             summary_parts.append("\n" + "=" * 50)
             return '\n'.join(summary_parts)
@@ -654,7 +664,7 @@ async def main():
     # Configuración
     OLLAMA_HOST = "172.16.1.37"
     OLLAMA_PORT = 11434
-    MODEL = "llama3.1:8b"
+    MODEL = "gemma3:12b"
     
     client = OllamaMCPClient(OLLAMA_HOST, OLLAMA_PORT, MODEL)
     

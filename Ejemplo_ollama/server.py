@@ -209,9 +209,25 @@ def execute_query(database: str, query: str, limit: int = 100) -> Dict[str, Any]
                 "timestamp": datetime.now().isoformat()
             }
         
-        # Agregar LIMIT si no existe
-        query_upper = query.strip().upper()
-        if 'LIMIT' not in query_upper:
+        # Agregar LIMIT si no existe (detección mejorada)
+        query_clean = query.strip()
+        query_upper = query_clean.upper()
+        
+        # Verificar más robustamente si ya tiene LIMIT
+        has_limit = (
+            'LIMIT' in query_upper or 
+            query_clean.endswith(';') or
+            query_upper.endswith('LIMIT') or
+            ' LIMIT ' in query_upper or
+            query_upper.endswith('LIMIT 1') or
+            query_upper.endswith('LIMIT 5') or
+            query_upper.endswith('LIMIT 10') or
+            query_upper.endswith('LIMIT 20') or
+            query_upper.endswith('LIMIT 50') or
+            query_upper.endswith('LIMIT 100')
+        )
+        
+        if not has_limit:
             query += f" LIMIT {limit}"
         
         with get_db_connection(database) as conn:
@@ -603,8 +619,8 @@ def generate_attendance_query(database: str, analysis_type: str, date_from: str 
                     DATE(tiempo) as fecha,
                     COUNT(*) as total_registros,
                     COUNT(DISTINCT usuario_id) as usuarios_unicos,
-                    COUNT(CASE WHEN evento = 'entrada' THEN 1 END) as entradas,
-                    COUNT(CASE WHEN evento = 'salida' THEN 1 END) as salidas
+                    COUNT(CASE WHEN estado_id = 1 THEN 1 END) as entradas,
+                    COUNT(CASE WHEN estado_id = 2 THEN 1 END) as salidas
                 FROM core_registro 
                 WHERE {where_clause}
                 GROUP BY DATE(tiempo)
@@ -618,8 +634,8 @@ def generate_attendance_query(database: str, analysis_type: str, date_from: str 
                     TIME(tiempo) as hora_llegada,
                     lugar, dispositivo
                 FROM core_registro 
-                WHERE evento = 'entrada' 
-                    AND TIME(tiempo) > '08:30:00'
+                WHERE estado_id = 1 
+                    AND TIME(tiempo) > '08:10:00'
                     AND {where_clause}
                 ORDER BY tiempo DESC;
             """,
@@ -630,12 +646,12 @@ def generate_attendance_query(database: str, analysis_type: str, date_from: str 
                     DATE(r1.tiempo) as fecha,
                     TIME(r1.tiempo) as hora_entrada
                 FROM core_registro r1
-                WHERE r1.evento = 'entrada' 
+                WHERE r1.estado_id = 1 
                     AND {where_clause.replace('tiempo', 'r1.tiempo')}
                     AND NOT EXISTS (
                         SELECT 1 FROM core_registro r2 
                         WHERE r2.usuario_id = r1.usuario_id 
-                            AND r2.evento = 'salida'
+                            AND r2.estado_id = 2
                             AND DATE(r2.tiempo) = DATE(r1.tiempo)
                             AND r2.tiempo > r1.tiempo
                     )
@@ -649,7 +665,7 @@ def generate_attendance_query(database: str, analysis_type: str, date_from: str 
                     MIN(tiempo) as primer_registro,
                     MAX(tiempo) as ultimo_registro,
                     COUNT(DISTINCT DATE(tiempo)) as dias_activos,
-                    AVG(CASE WHEN evento = 'entrada' THEN HOUR(tiempo) + MINUTE(tiempo)/60.0 END) as hora_promedio_entrada
+                    AVG(CASE WHEN estado_id = 1 THEN HOUR(tiempo) + MINUTE(tiempo)/60.0 END) as hora_promedio_entrada
                 FROM core_registro 
                 WHERE {where_clause}
                 GROUP BY usuario_id, nombre, codigo_usuario
@@ -827,8 +843,8 @@ def validate_attendance_data(database: str, data_issues: str) -> Dict[str, Any]:
                 FROM core_registro r1
                 JOIN core_registro r2 ON r1.usuario_id = r2.usuario_id
                     AND DATE(r1.tiempo) = DATE(r2.tiempo)
-                    AND r1.evento = 'entrada' 
-                    AND r2.evento = 'salida'
+                    AND r1.estado_id = 1 
+                    AND r2.estado_id = 2
                     AND r2.tiempo > r1.tiempo
                 WHERE TIMESTAMPDIFF(HOUR, r1.tiempo, r2.tiempo) > 12
                     OR TIMESTAMPDIFF(MINUTE, r1.tiempo, r2.tiempo) < 30
@@ -902,11 +918,11 @@ def create_attendance_kpis(database: str) -> Dict[str, Any]:
                 # 1. Tasa de puntualidad
                 cursor.execute("""
                     SELECT 
-                        COUNT(CASE WHEN TIME(tiempo) <= '08:30:00' THEN 1 END) as puntuales,
-                        COUNT(CASE WHEN evento = 'entrada' THEN 1 END) as total_entradas
+                        COUNT(CASE WHEN TIME(tiempo) <= '08:10:00' THEN 1 END) as puntuales,
+                        COUNT(CASE WHEN estado_id = 1 THEN 1 END) as total_entradas
                     FROM core_registro 
                     WHERE tiempo >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-                        AND evento = 'entrada';
+                        AND estado_id = 1;
                 """)
                 punctuality = cursor.fetchone()
                 
@@ -927,8 +943,8 @@ def create_attendance_kpis(database: str) -> Dict[str, Any]:
                         FROM core_registro r1
                         JOIN core_registro r2 ON r1.usuario_id = r2.usuario_id
                             AND DATE(r1.tiempo) = DATE(r2.tiempo)
-                            AND r1.evento = 'entrada' 
-                            AND r2.evento = 'salida'
+                            AND r1.estado_id = 1 
+                            AND r2.estado_id = 2
                             AND r2.tiempo > r1.tiempo
                         WHERE r1.tiempo >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                     ) horas_diarias;
@@ -943,7 +959,7 @@ def create_attendance_kpis(database: str) -> Dict[str, Any]:
                     SELECT COUNT(DISTINCT DATE(tiempo)) as dias_activos
                     FROM core_registro 
                     WHERE tiempo >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-                        AND evento = 'entrada';
+                        AND estado_id = 1;
                 """)
                 active_days = cursor.fetchone()
                 
