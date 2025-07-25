@@ -145,29 +145,6 @@ class OllamaMCPClient:
         except Exception as e:
             return f"Error conectando con Ollama: {e}"
     
-    def _parse_mcp_params_robust(self, params_str: str) -> Dict[str, Any]:
-        """Parser robusto para parámetros MCP que maneja strings SQL complejos"""
-        params = {}
-        
-        # Parsing específico para execute_query con query SQL
-        if 'query=' in params_str:
-            # Encontrar database
-            db_match = re.search(r'database=(["\'])(.*?)\1', params_str)
-            if db_match:
-                params['database'] = db_match.group(2)
-            
-            # Encontrar query (más complejo porque puede tener comas)
-            query_match = re.search(r'query=(["\'])(.*)\1(?:\s*\)|$)', params_str, re.DOTALL)
-            if query_match:
-                params['query'] = query_match.group(2)
-            
-            # Encontrar limit si existe
-            limit_match = re.search(r'limit=(\d+)', params_str)
-            if limit_match:
-                params['limit'] = int(limit_match.group(1))
-        
-        return params
-
     async def execute_mcp_tool(self, tool_name: str, **kwargs) -> Dict[str, Any]:
         """Ejecutar una herramienta usando MCP real"""
         try:
@@ -541,21 +518,94 @@ EJEMPLOS ADICIONALES:
             return f"❌ Error generando resumen semanal: {e}"
     
     async def parse_and_execute_mcp_tool(self, tool_call: str) -> Dict[str, Any]:
-        """Parsear y ejecutar herramienta MCP con parsing mejorado"""
+        """Parsear y ejecutar una llamada a herramienta MCP de forma robusta"""
         try:
-            if "(" in tool_call and tool_call.endswith(")"):
-                tool_name = tool_call[:tool_call.find("(")]
-                params_str = tool_call[tool_call.find("(")+1:-1]
+            # Extraer nombre de la función y parámetros
+            if '(' in tool_call:
+                tool_name = tool_call.split('(')[0].strip()
+                params_str = tool_call.split('(', 1)[1].rsplit(')', 1)[0].strip()
                 
-                # Usar parser robusto para execute_query
-                if tool_name == 'execute_query' and 'query=' in params_str:
-                    kwargs = self._parse_mcp_params_robust(params_str)
-                else:
-                    # Parsing estándar para otras herramientas
+                # Parsear parámetros usando eval seguro para casos simples
+                kwargs = {}
+                if params_str:
                     try:
-                        kwargs = eval(f'dict({params_str})')
+                        # Parsing seguro usando ast.literal_eval para casos simples
+                        import ast
+                        # Intentar evaluar como diccionario literal
+                        if params_str.startswith('{') and params_str.endswith('}'):
+                            kwargs = ast.literal_eval(params_str)
+                        else:
+                            # Construir diccionario seguro manualmente
+                            kwargs = {}
+                            for param in params_str.split(','):
+                                if '=' in param:
+                                    key, value = param.split('=', 1)
+                                    key = key.strip()
+                                    value = value.strip().strip('\'"')
+                                    # Validación de tipos segura
+                                    if value.isdigit():
+                                        kwargs[key] = int(value)
+                                    elif value.replace('.', '', 1).isdigit():
+                                        kwargs[key] = float(value)
+                                    elif value.lower() in ['true', 'false']:
+                                        kwargs[key] = value.lower() == 'true'
+                                    elif value.lower() == 'none':
+                                        kwargs[key] = None
+                                    else:
+                                        kwargs[key] = value
                     except:
-                        kwargs = {}
+                        # Fallback al parsing manual si eval falla
+                        import re
+                        # Patrón corregido que maneja strings SQL complejos con comas
+                        param_pattern = r'(\w+)=(["\'])([^"\']*?)\2(?=\s*[,)]|$)|(\w+)=([^,\s)]+)'
+                        matches = re.findall(param_pattern, params_str)
+                        
+                        # Si el regex falla, usar método manual más robusto
+                        if not matches and 'query=' in params_str:
+                            # Parsing manual específico para query con strings SQL complejos
+                            parts = {}
+                            query_start = params_str.find('query="')
+                            if query_start != -1:
+                                query_start += 7  # len('query="')
+                                quote_count = 0
+                                query_end = query_start
+                                for i, char in enumerate(params_str[query_start:], query_start):
+                                    if char == '"' and (i == query_start or params_str[i-1] != '\\'):
+                                        quote_count += 1
+                                        if quote_count == 1:  # Encontramos el cierre
+                                            query_end = i
+                                            break
+                                
+                                if query_end > query_start:
+                                    parts['query'] = params_str[query_start:query_end]
+                                    
+                                    # Extraer database también
+                                    db_match = re.search(r'database=(["\'])([^"\']*?)\1', params_str)
+                                    if db_match:
+                                        parts['database'] = db_match.group(2)
+                                    
+                                                                                                          # Usar parts como kwargs
+                                 kwargs = parts
+                         
+                         # Solo procesar matches si no usamos el parsing manual
+                         if not ('query' in kwargs and len(kwargs) >= 1):
+                             for match in matches:
+                            if match[0]:  # String quoted
+                                key, _, value = match[0], match[1], match[2]
+                            else:  # Unquoted value
+                                key, value = match[3], match[4]
+                            
+                            # Convertir tipos básicos
+                            if value.isdigit():
+                                kwargs[key] = int(value)
+                            elif value.replace('.', '', 1).isdigit():
+                                kwargs[key] = float(value)
+                            elif value.lower() in ['true', 'false']:
+                                kwargs[key] = value.lower() == 'true'
+                            elif value.lower() == 'none':
+                                kwargs[key] = None
+                            else:
+                                kwargs[key] = value
                 
                 return await self.execute_mcp_tool(tool_name, **kwargs)
             else:

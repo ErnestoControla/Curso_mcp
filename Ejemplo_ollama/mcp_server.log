@@ -646,3 +646,144 @@
 2025-07-24 11:45:11,957 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre...
 2025-07-24 11:45:43,583 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
 2025-07-24 11:45:43,584 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre...
+2025-07-24 12:10:25,920 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 12:10:25,969 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 12:10:25,972 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:10:25,999 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:10:26,016 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:10:26,059 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:10:26,132 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:10:26,133 - __main__ - INFO - 🔍 Probando conexión a la base de datos MariaDB
+2025-07-24 12:10:54,418 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:10:54,419 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) = CURDATE() AND estado_id = 1 LIMIT 20...
+2025-07-24 12:12:45,396 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:12:45,396 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) BETWEEN '2025-07-01' AND '2025-07-31' AND estado...
+2025-07-24 12:42:06,535 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:42:06,536 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) = DATE_SUB(CURDATE()...
+2025-07-24 12:43:11,499 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:43:11,499 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) = DATE_SUB(CURDATE()...
+2025-07-24 12:43:56,806 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:43:56,806 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) = DATE_SUB(CURDATE()...
+2025-07-24 12:44:08,073 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:44:08,073 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE estado_id = 1 AND TIME(tiempo) > '08:10:00' AND TIME(tiempo) ...
+2025-07-24 12:44:23,690 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 12:44:23,691 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE estado_id = 1 AND TIME(tiempo) > '08:10:00' AND TIME(tiempo) ...
+2025-07-24 14:00:37,837 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:00:37,886 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:00:37,891 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:00:37,916 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:00:37,945 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:00:37,983 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:00:38,021 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:00:38,021 - __main__ - INFO - 🔍 Probando conexión a la base de datos MariaDB
+2025-07-24 14:01:46,796 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:01:46,797 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE estado_id = 1 AND TIME(tiempo) > '08:10:00' AND TIME(tiempo) ...
+2025-07-24 14:02:55,882 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:02:55,885 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre...
+2025-07-24 14:05:12,858 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:05:12,859 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT COUNT(DISTINCT nombre) FROM core_registro WHERE estado_id = 1 AND DATE(tiempo) >= DATE_SUB(CU...
+2025-07-24 14:06:39,736 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:06:39,784 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:06:39,785 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE estado_id = 1 AND TIME(tiempo) > '08:10:00' AND TIME(tiempo) ...
+2025-07-24 14:06:39,806 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:06:39,811 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:06:39,811 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT COUNT(*) as total FROM core_registro WHERE estado_id = 1...
+2025-07-24 14:06:39,837 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:06:39,837 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre, COUNT(*) as total FROM core_registro GROUP BY nombre LIMIT 5...
+2025-07-24 14:06:39,867 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:06:39,867 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT COUNT(DISTINCT nombre) as personas_unicas FROM core_registro...
+2025-07-24 14:08:00,272 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:08:00,321 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:08:00,325 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:08:00,354 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:08:00,411 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:08:00,462 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:08:00,498 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:08:00,498 - __main__ - INFO - 🔍 Probando conexión a la base de datos MariaDB
+2025-07-24 14:08:44,492 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:08:44,492 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) BETWEEN '2025-07-01' AND '2025-07-31' AND estado...
+2025-07-24 14:09:00,217 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:09:00,217 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre...
+2025-07-24 14:10:45,990 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:10:46,038 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:10:46,039 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre, COUNT(*) as total FROM core_registro GROUP BY nombre ORDER BY total DESC LIMIT 5...
+2025-07-24 14:10:46,059 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:10:46,064 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:10:46,065 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT core_registro.nombre, COUNT(*) as total FROM core_registro GROUP BY core_registro.nombre ORDE...
+2025-07-24 14:10:46,096 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:10:46,097 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT COUNT(*) as total_tablas FROM information_schema.tables WHERE table_schema = 'zapopan' ...
+2025-07-24 14:11:44,057 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:11:44,105 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:11:44,106 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre, COUNT(*) as total FROM core_registro GROUP BY nombre ORDER BY total DESC LIMIT 5...
+2025-07-24 14:11:44,126 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:11:44,142 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:11:44,142 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT core_registro.nombre, COUNT(*) as total FROM core_registro GROUP BY core_registro.nombre ORDE...
+2025-07-24 14:12:55,275 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:12:55,333 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:12:55,348 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:12:55,400 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:12:55,451 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:12:55,532 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:12:55,570 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:12:55,570 - __main__ - INFO - 🔍 Probando conexión a la base de datos MariaDB
+2025-07-24 14:13:50,985 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:13:50,985 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) BETWEEN '2025-07-01' AND '2025-07-31' AND estado...
+2025-07-24 14:14:07,041 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:14:07,090 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:14:07,094 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:07,128 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:07,169 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:07,198 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:09,728 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:09,729 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre...
+2025-07-24 14:14:47,155 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:14:47,205 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:47,205 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre, COUNT(*) as total FROM core_registro GROUP BY nombre ORDER BY total DESC LIMIT 10...
+2025-07-24 14:14:47,223 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:14:47,233 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:47,257 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:14:47,257 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT COUNT(*) as total FROM core_registro...
+2025-07-24 14:16:05,797 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 14:16:05,850 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 14:16:05,855 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:16:05,876 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:16:05,912 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:16:05,954 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:16:08,542 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 14:16:08,542 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre...
+2025-07-24 16:23:03,171 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 16:23:03,219 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 16:23:03,222 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:23:03,238 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:23:03,254 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:23:03,292 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:23:10,211 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:23:10,211 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre...
+2025-07-24 16:25:39,523 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 16:25:39,574 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 16:25:39,578 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:25:39,613 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:25:39,633 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:25:39,692 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:25:42,306 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:25:42,307 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre, COUNT(*) as total FROM core_registro GROUP BY nombre ORDER BY total DESC LIMIT 10...
+2025-07-24 16:26:49,980 - __main__ - INFO - 🚀 Iniciando servidor MCP de análisis de base de datos
+2025-07-24 16:26:50,048 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest
+2025-07-24 16:26:50,052 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:26:50,082 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:26:50,114 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:26:50,156 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:26:50,196 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:26:50,197 - __main__ - INFO - 🔍 Probando conexión a la base de datos MariaDB
+2025-07-24 16:27:05,179 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:27:05,180 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) = CURDATE() AND estado_id = 1 LIMIT 20...
+2025-07-24 16:27:21,698 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:27:21,699 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) = CURDATE() - INTERVAL 1 DAY AND estado_id = 1 L...
+2025-07-24 16:27:34,492 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:27:34,492 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) BETWEEN '2025-07-01' AND '2025-07-31' AND estado...
+2025-07-24 16:27:56,989 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:27:56,989 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre, COUNT(*) as total FROM core_registro WHERE DATE(tiempo) BETWEEN '2025-07-01' AND '202...
+2025-07-24 16:28:19,044 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:28:19,045 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre FROM core_registro WHERE DATE(tiempo) BETWEEN '2025-06-01' AND '2025-06-30' AND estado...
+2025-07-24 16:28:44,878 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-07-24 16:28:44,879 - __main__ - INFO - 🔍 Ejecutando consulta en base de datos 'zapopan': SELECT nombre, COUNT(*) as total FROM core_registro WHERE DATE(tiempo) BETWEEN '2025-06-01' AND '202...
